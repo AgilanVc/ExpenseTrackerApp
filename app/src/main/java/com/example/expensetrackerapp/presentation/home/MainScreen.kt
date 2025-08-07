@@ -42,6 +42,9 @@ fun MainScreen(navController: NavController) {
             Button(onClick = { navController.navigate(NavRoutes.ViewExpenses) }) {
                 Text("View Expenses")
             }
+            Button(onClick = { navController.navigate(NavRoutes.SortAndFilterExpense) }) {
+                Text("Sort And Filter Expenses")
+            }
 
         }
     }
