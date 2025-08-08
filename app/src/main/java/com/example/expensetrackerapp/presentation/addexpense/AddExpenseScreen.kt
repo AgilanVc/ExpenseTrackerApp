@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
@@ -18,9 +19,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
@@ -34,6 +37,9 @@ import com.example.expensetrackerapp.data.local.ExpenseDatabase
 import com.example.expensetrackerapp.data.repository.ExpenseRepository
 import com.example.expensetrackerapp.domain.AddExpenseUseCase
 import com.example.expensetrackerapp.presentation.nav.NavRoutes
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -87,7 +93,7 @@ fun AddExpenseScreen(navController: NavController) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Add Expense") }, // or View Expenses, etc.
+                title = { Text("Add Expense") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
@@ -97,6 +103,7 @@ fun AddExpenseScreen(navController: NavController) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -104,6 +111,7 @@ fun AddExpenseScreen(navController: NavController) {
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Date Picker
             OutlinedTextField(
                 value = formattedDate,
                 onValueChange = {},
@@ -119,15 +127,11 @@ fun AddExpenseScreen(navController: NavController) {
                 enabled = false
             )
 
-
-            // Description
-            OutlinedTextField(
+            // ✅ Description with AutoComplete
+            ExpenseDescriptionAutoCompleteField(
+                allSubcategories = defaultSubcategoryList(),
                 value = uiState.description,
-                onValueChange = {
-                    viewModel.onEvent(AddExpenseUiEvent.DescriptionChanged(it))
-                },
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth()
+                onValueChange = { viewModel.onEvent(AddExpenseUiEvent.DescriptionChanged(it)) }
             )
 
             // Amount
@@ -164,19 +168,95 @@ fun AddExpenseScreen(navController: NavController) {
                 }
             }
 
-            // Submit Button
+            // Submit
             Button(
-                onClick = {
-                    viewModel.onEvent(AddExpenseUiEvent.Submit)
-                },
+                onClick = { viewModel.onEvent(AddExpenseUiEvent.Submit) },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text("Add Expense")
             }
         }
     }
-
 }
+
+fun defaultSubcategoryList(): List<String> {
+    return listOf(
+        "Breakfast", "Lunch", "Dinner", "Snacks", "Groceries", "Restaurant", "Café / Coffee",
+        "Rent", "Mortgage", "Home Maintenance", "Property Tax", "Home Insurance", "Furnishing", "Utilities",
+        "Fuel", "Public Transport", "Taxi / Ride Share", "Vehicle Maintenance", "Vehicle Insurance", "Parking Fees", "Toll Charges",
+        "Electricity", "Water", "Internet", "Mobile Bill", "Gas", "Cable", "TV Subscription", "OTT",
+        "Clothing", "Electronics", "Accessories", "Gifts", "Home Items",
+        "Medicines", "Doctor Visits", "Health Insurance", "Lab Tests", "GYM", "Yoga", "Sports",
+        "Tuition Fees", "Books & Supplies", "Online Courses", "Coaching/Training",
+        "Office Supplies", "Business Travel", "Subscriptions", "Client Meeting Expenses",
+        "Movies", "Streaming Services", "Games", "Events & Shows", "Hobbies",
+        "Flights", "Accommodation", "Local Transport", "Food (While Travel)", "Sightseeing",
+        "Stocks", "Mutual Funds", "Crypto", "Fixed Deposits", "Real Estate",
+        "Salon / Haircut", "Cosmetics", "Spa / Massage", "Toiletries",
+        "Pet Food", "Veterinary", "Grooming", "Accessories",
+        "Childcare", "Elder Care", "Gifts", "Anniversary", "Birthday",
+        "Loan EMI", "Credit Card Payment", "Interest Paid",
+        "Religious Offering", "NGO Donation", "Crowdfunding",
+        "Uncategorized", "Lost Money", "Others"
+    )
+}
+
+
+@Composable
+fun ExpenseDescriptionAutoCompleteField(
+    allSubcategories: List<String>,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    var filteredList by remember { mutableStateOf(emptyList<String>()) }
+    var job by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { newValue ->
+                onValueChange(newValue)
+                job?.cancel()
+                job = scope.launch {
+                    delay(150)
+                    filteredList = if (newValue.length >= 3) {
+                        allSubcategories.filter {
+                            it.contains(newValue, ignoreCase = true)
+                        }
+                    } else {
+                        emptyList()
+                    }
+                }
+            },
+            label = { Text("Description") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        if (filteredList.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+            ) {
+                items(filteredList) { suggestion ->
+                    Text(
+                        text = suggestion,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onValueChange(suggestion)
+                                filteredList = emptyList()
+                            }
+                            .padding(12.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 fun showDatePickerAndTimePicker(
     context: Context,

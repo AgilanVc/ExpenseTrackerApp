@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,14 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,11 +50,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.expensetrackerapp.data.local.entity.ExpenseEntity
 import java.text.SimpleDateFormat
-
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun SortAndFilterExpenseScreen(navController: NavController) {
@@ -73,121 +79,136 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
 // Mode: "", "Sort", "Filter"
     var mode by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Sort And Filter Expense", style = MaterialTheme.typography.titleLarge)
-
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth() // Makes the Row take the full available width
-                .padding(16.dp), // Adds padding around the row
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceAround // Distributes space evenly around items
-        ) {
-            Button(onClick = {
-                mode = "Sort"
-            }) {
-                Text("Expense Sorting")
-            }
-            Button(onClick = {
-                mode = "Filter"
-            }) {
-                Text("Filter Expense")
-            }
-            Button(onClick = {
-                viewModel.clearFilter()
-                mode = ""
-            }) {
-                Text("Clear")
-            }
-        }
-
-        // Filter Type Dropdown
-        if (mode == "Filter") {
-            DropdownSelector(
-                label = "Filter Type",
-                options = filterTypes,
-                selected = selectedFilterType,
-                onSelectedChange = { selectedFilterType = it }
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Sort And Filter Expense") }, // or View Expenses, etc.
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
             )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth() // Makes the Row take the full available width
+                    .padding(4.dp), // Adds padding around the row
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceAround // Distributes space evenly around items
+            ) {
+                Button(onClick = {
+                    mode = "Sort"
+                }) {
+                    Text("Sort By")
+                }
+                Button(onClick = {
+                    mode = "Filter"
+                }) {
+                    Text("Filter")
+                }
+                Button(onClick = {
+                    viewModel.clearFilter()
+                    mode = ""
+                }) {
+                    Text("Clear")
+                }
+            }
 
-            Spacer(Modifier.height(8.dp))
+            // Filter Type Dropdown
+            if (mode == "Filter") {
+                DropdownSelector(
+                    label = "Filter Type",
+                    options = filterTypes,
+                    selected = selectedFilterType,
+                    onSelectedChange = { selectedFilterType = it }
+                )
 
-            if (selectedFilterType == "Date Range") {
-                DatePickerField("From Date", fromDate) { fromDate = it }
-                DatePickerField("To Date", toDate) { toDate = it }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    DropdownSelector(
-                        label = "Condition",
-                        options = amountConditions,
-                        selected = amountCondition,
-                        onSelectedChange = { amountCondition = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = amountValue,
-                        onValueChange = { amountValue = it },
-                        label = { Text("Amount") },
-                        modifier = Modifier.weight(2f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
+                Spacer(Modifier.height(8.dp))
+
+                if (selectedFilterType == "Date Range") {
+                    DatePickerField("From Date", fromDate) { fromDate = it }
+                    DatePickerField("To Date", toDate) { toDate = it }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DropdownSelector(
+                            label = "Condition",
+                            options = amountConditions,
+                            selected = amountCondition,
+                            onSelectedChange = { amountCondition = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = amountValue,
+                            onValueChange = { amountValue = it },
+                            label = { Text("Amount") },
+                            modifier = Modifier.weight(2f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        if (selectedFilterType == "Date Range") {
+                            viewModel.applyDateFilter(
+                                fromDate = fromDate,
+                                toDate = toDate
+                            )
+                        } else {
+                            viewModel.applyAmountFilter(
+                                amountCondition = amountCondition,
+                                amountValue = amountValue.toDoubleOrNull()
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Apply")
                 }
             }
             Spacer(Modifier.height(12.dp))
+            if (mode == "Sort") {
+                // Sort Option
+                DropdownSelector(
+                    label = "Sort By",
+                    options = sortOptions,
+                    selected = selectedSortOption,
+                    onSelectedChange = { selectedSortOption = it }
+                )
 
-            Button(
-                onClick = {
-                    if (selectedFilterType == "Date Range") {
-                        viewModel.applyDateFilter(
-                            fromDate = fromDate,
-                            toDate = toDate
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.applySort(
+                            sortOption = selectedSortOption
                         )
-                    } else {
-                        viewModel.applyAmountFilter(
-                            amountCondition = amountCondition,
-                            amountValue = amountValue.toDoubleOrNull()
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Apply")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Apply")
+                }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (mode == "Sort") {
-            // Sort Option
-            DropdownSelector(
-                label = "Sort By",
-                options = sortOptions,
-                selected = selectedSortOption,
-                onSelectedChange = { selectedSortOption = it }
-            )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    viewModel.applySort(
-                        sortOption = selectedSortOption
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Apply")
+            LazyColumn {
+                items(expenses) { expense ->
+                    ExpenseItem(expense)
+                }
             }
-        }
-        Spacer(Modifier.height(16.dp))
 
-        LazyColumn {
-            items(expenses) { expense ->
-                ExpenseItem(expense)
-            }
         }
-
     }
-
 }
 
 @Composable
