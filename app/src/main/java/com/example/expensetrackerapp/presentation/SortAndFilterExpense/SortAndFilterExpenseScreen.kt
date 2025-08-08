@@ -64,7 +64,6 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
     var amountValue by remember { mutableStateOf("") }
     var fromDate by remember { mutableStateOf<LocalDate?>(null) }
     var toDate by remember { mutableStateOf<LocalDate?>(null) }
-
     var selectedSortOption by remember { mutableStateOf("Date Ascending") }
 
     val filterTypes = listOf("Date Range", "Amount")
@@ -187,7 +186,6 @@ fun DropdownSelector(
 fun DatePickerField(label: String, date: LocalDate?, onDateSelected: (LocalDate) -> Unit) {
     val context = LocalContext.current
     val dateFormat = DateTimeFormatter.ofPattern("dd MMM yyyy")
-    val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
         DatePickerDialog(context).apply {
             setOnDateSetListener { _, year, month, day ->
@@ -201,7 +199,9 @@ fun DatePickerField(label: String, date: LocalDate?, onDateSelected: (LocalDate)
         onValueChange = {},
         label = { Text(label) },
         readOnly = true,
+        enabled = false,
         modifier = Modifier
+            .padding(10.dp)
             .fillMaxWidth()
             .clickable {
                 datePickerDialog.show()

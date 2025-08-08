@@ -11,7 +11,9 @@ import com.example.expensetrackerapp.data.repository.ExpenseRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class ExpenseViewModel (application: Application) : AndroidViewModel(application) {
@@ -45,9 +47,10 @@ class ExpenseViewModel (application: Application) : AndroidViewModel(application
         var result = _allExpenses.value
 
         if (filterType == "Date Range") {
-            val formatter = DateTimeFormatter.ISO_LOCAL_DATE
             result = result.filter {
-                val expenseDate = LocalDate.parse(it.date.toString(), formatter)
+                val expenseDate = Instant.ofEpochMilli(it.date.toString().toLong())
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
                 val isAfterFrom = fromDate?.let { fd -> expenseDate >= fd } ?: true
                 val isBeforeTo = toDate?.let { td -> expenseDate <= td } ?: true
                 isAfterFrom && isBeforeTo
@@ -67,8 +70,12 @@ class ExpenseViewModel (application: Application) : AndroidViewModel(application
         }
 
         result = when (sortOption) {
-            "Date Ascending" -> result.sortedBy { it.date }
-            "Date Descending" -> result.sortedByDescending { it.date }
+            "Date Ascending" -> result.sortedBy { Instant.ofEpochMilli(it.date.toLong())
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate() }
+            "Date Descending" -> result.sortedByDescending { Instant.ofEpochMilli(it.date.toLong())
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate() }
             "Amount Ascending" -> result.sortedBy { it.amount }
             "Amount Descending" -> result.sortedByDescending { it.amount }
             else -> result
