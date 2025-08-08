@@ -14,15 +14,12 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-class ExpenseViewModel (application: Application) : AndroidViewModel(application) {
+class ExpenseViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ExpenseRepository(ExpenseDatabase.getDatabase(application).expenseDao())
-
+    private val repository =
+        ExpenseRepository(ExpenseDatabase.getDatabase(application).expenseDao())
     private val _allExpenses = MutableStateFlow<List<ExpenseEntity>>(emptyList())
-    val allExpenses: StateFlow<List<ExpenseEntity>> = _allExpenses
-
     private val _filteredExpenses = MutableStateFlow<List<ExpenseEntity>>(emptyList())
     val filteredExpenses: StateFlow<List<ExpenseEntity>> = _filteredExpenses
 
@@ -36,52 +33,68 @@ class ExpenseViewModel (application: Application) : AndroidViewModel(application
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    fun applyFilterAndSort(
-        filterType: String,
+    fun applyDateFilter(
         fromDate: LocalDate?,
-        toDate: LocalDate?,
+        toDate: LocalDate?
+    ) {
+        var result = _allExpenses.value
+        result = result.filter {
+            val expenseDate = Instant.ofEpochMilli(it.date.toString().toLong())
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+            val isAfterFrom = fromDate?.let { fd -> expenseDate >= fd } ?: true
+            val isBeforeTo = toDate?.let { td -> expenseDate <= td } ?: true
+            isAfterFrom && isBeforeTo
+        }
+        _filteredExpenses.value = result
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun applyAmountFilter(
         amountCondition: String,
-        amountValue: Double?,
+        amountValue: Double?
+    ) {
+        var result = _allExpenses.value
+        result = result.filter {
+            when (amountCondition) {
+                "=" -> it.amount == amountValue
+                ">" -> it.amount > amountValue!!
+                "<" -> it.amount < amountValue!!
+                else -> true
+            }
+        }
+        _filteredExpenses.value = result
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun applySort(
         sortOption: String
     ) {
         var result = _allExpenses.value
-
-        if (filterType == "Date Range") {
-            result = result.filter {
-                val expenseDate = Instant.ofEpochMilli(it.date.toString().toLong())
+        result = when (sortOption) {
+            "Date Ascending" -> result.sortedBy {
+                Instant.ofEpochMilli(it.date)
                     .atZone(ZoneId.systemDefault())
                     .toLocalDate()
-                val isAfterFrom = fromDate?.let { fd -> expenseDate >= fd } ?: true
-                val isBeforeTo = toDate?.let { td -> expenseDate <= td } ?: true
-                isAfterFrom && isBeforeTo
             }
 
-
-        }
-        else if (filterType == "Amount" && amountValue != null) {
-            result = result.filter {
-                when (amountCondition) {
-                    "=" -> it.amount == amountValue
-                    ">" -> it.amount > amountValue
-                    "<" -> it.amount < amountValue
-                    else -> true
-                }
+            "Date Descending" -> result.sortedByDescending {
+                Instant.ofEpochMilli(it.date)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
             }
-        }
 
-        result = when (sortOption) {
-            "Date Ascending" -> result.sortedBy { Instant.ofEpochMilli(it.date.toLong())
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate() }
-            "Date Descending" -> result.sortedByDescending { Instant.ofEpochMilli(it.date.toLong())
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate() }
             "Amount Ascending" -> result.sortedBy { it.amount }
             "Amount Descending" -> result.sortedByDescending { it.amount }
             else -> result
         }
-
         _filteredExpenses.value = result
     }
+
+    fun clearFilter() {
+        _filteredExpenses.value = _allExpenses.value
+    }
 }
+
+
 

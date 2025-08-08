@@ -47,7 +47,6 @@ import java.text.SimpleDateFormat
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 import java.util.Locale
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -59,6 +58,7 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
     )
     val expenses by viewModel.filteredExpenses.collectAsState()
 
+
     var selectedFilterType by remember { mutableStateOf("Date Range") }
     var amountCondition by remember { mutableStateOf(">") }
     var amountValue by remember { mutableStateOf("") }
@@ -67,75 +67,117 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
     var selectedSortOption by remember { mutableStateOf("Date Ascending") }
 
     val filterTypes = listOf("Date Range", "Amount")
-    val sortOptions = listOf("Date Ascending", "Date Descending", "Amount Ascending", "Amount Descending")
+    val sortOptions =
+        listOf("Date Ascending", "Date Descending", "Amount Ascending", "Amount Descending")
     val amountConditions = listOf("=", ">", "<")
+// Mode: "", "Sort", "Filter"
+    var mode by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Sort And Filter Expense", style = MaterialTheme.typography.titleLarge)
 
         Spacer(Modifier.height(16.dp))
-
-        // Filter Type Dropdown
-        DropdownSelector(
-            label = "Filter Type",
-            options = filterTypes,
-            selected = selectedFilterType,
-            onSelectedChange = { selectedFilterType = it }
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        if (selectedFilterType == "Date Range") {
-            DatePickerField("From Date", fromDate) { fromDate = it }
-            DatePickerField("To Date", toDate) { toDate = it }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DropdownSelector(
-                    label = "Condition",
-                    options = amountConditions,
-                    selected = amountCondition,
-                    onSelectedChange = { amountCondition = it },
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = amountValue,
-                    onValueChange = { amountValue = it },
-                    label = { Text("Amount") },
-                    modifier = Modifier.weight(2f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth() // Makes the Row take the full available width
+                .padding(16.dp), // Adds padding around the row
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceAround // Distributes space evenly around items
+        ) {
+            Button(onClick = {
+                mode = "Sort"
+            }) {
+                Text("Expense Sorting")
+            }
+            Button(onClick = {
+                mode = "Filter"
+            }) {
+                Text("Filter Expense")
+            }
+            Button(onClick = {
+                viewModel.clearFilter()
+                mode = ""
+            }) {
+                Text("Clear")
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        // Filter Type Dropdown
+        if (mode == "Filter") {
+            DropdownSelector(
+                label = "Filter Type",
+                options = filterTypes,
+                selected = selectedFilterType,
+                onSelectedChange = { selectedFilterType = it }
+            )
 
-        // Sort Option
-        DropdownSelector(
-            label = "Sort By",
-            options = sortOptions,
-            selected = selectedSortOption,
-            onSelectedChange = { selectedSortOption = it }
-        )
+            Spacer(Modifier.height(8.dp))
 
-        Spacer(Modifier.height(12.dp))
+            if (selectedFilterType == "Date Range") {
+                DatePickerField("From Date", fromDate) { fromDate = it }
+                DatePickerField("To Date", toDate) { toDate = it }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DropdownSelector(
+                        label = "Condition",
+                        options = amountConditions,
+                        selected = amountCondition,
+                        onSelectedChange = { amountCondition = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = amountValue,
+                        onValueChange = { amountValue = it },
+                        label = { Text("Amount") },
+                        modifier = Modifier.weight(2f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
 
-        Button(
-            onClick = {
-                viewModel.applyFilterAndSort(
-                    filterType = selectedFilterType,
-                    fromDate = fromDate,
-                    toDate = toDate,
-                    amountCondition = amountCondition,
-                    amountValue = amountValue.toDoubleOrNull(),
-                    sortOption = selectedSortOption
-                )
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Apply")
+            Button(
+                onClick = {
+                    if (selectedFilterType == "Date Range") {
+                        viewModel.applyDateFilter(
+                            fromDate = fromDate,
+                            toDate = toDate
+                        )
+                    } else {
+                        viewModel.applyAmountFilter(
+                            amountCondition = amountCondition,
+                            amountValue = amountValue.toDoubleOrNull()
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Apply")
+            }
         }
+        Spacer(Modifier.height(12.dp))
+        if (mode == "Sort") {
+            // Sort Option
+            DropdownSelector(
+                label = "Sort By",
+                options = sortOptions,
+                selected = selectedSortOption,
+                onSelectedChange = { selectedSortOption = it }
+            )
 
+            Spacer(Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    viewModel.applySort(
+                        sortOption = selectedSortOption
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Apply")
+            }
+        }
         Spacer(Modifier.height(16.dp))
 
         LazyColumn {
@@ -143,7 +185,9 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
                 ExpenseItem(expense)
             }
         }
+
     }
+
 }
 
 @Composable
@@ -220,9 +264,20 @@ fun ExpenseItem(expense: ExpenseEntity) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.padding(12.dp)) {
-            Text("Date: ${SimpleDateFormat("ddMMMyy,hh:mma", Locale.getDefault()).format(expense.date)}")
+            Text(
+                "Date: ${
+                    SimpleDateFormat(
+                        "ddMMMyy,hh:mma",
+                        Locale.getDefault()
+                    ).format(expense.date)
+                }"
+            )
             Text("Description: ${expense.description}")
-            Text("Amount: ₹${expense.amount}", color = color, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Amount: ₹${expense.amount}",
+                color = color,
+                style = MaterialTheme.typography.bodyLarge
+            )
             Text("Type: ${expense.type}", color = color)
         }
     }
