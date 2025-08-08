@@ -4,23 +4,51 @@ import android.app.Application
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.expensetrackerapp.data.local.ExpenseDatabase
 import com.example.expensetrackerapp.data.local.entity.ExpenseEntity
 import com.example.expensetrackerapp.data.repository.ExpenseRepository
+import com.example.expensetrackerapp.presentation.viewexpenses.ViewExpensesUiEvent
+import com.example.expensetrackerapp.presentation.viewexpenses.ViewExpensesUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-class ExpenseViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository =
-        ExpenseRepository(ExpenseDatabase.getDatabase(application).expenseDao())
+class ExpenseViewModel(
+    private val repository: ExpenseRepository
+) : ViewModel() {
     private val _allExpenses = MutableStateFlow<List<ExpenseEntity>>(emptyList())
     private val _filteredExpenses = MutableStateFlow<List<ExpenseEntity>>(emptyList())
+    private val _uiState = MutableStateFlow(SortAndFilterUiState(isLoading = true))
+    val uiState: StateFlow<SortAndFilterUiState> = _uiState
+    fun onEvent(event: SortAndFilterUiEvent) {
+        when (event) {
+            is SortAndFilterUiEvent.LoadFilterExpenses -> loadExpenses()
+        }
+    }
+
+    private fun loadExpenses() {
+        viewModelScope.launch {
+            repository.getAllExpenses().collect { expenseList ->
+                val creditTotal = expenseList.filter { it.type == "credit" }.sumOf { it.amount }
+                val debitTotal = expenseList.filter { it.type == "debit" }.sumOf { it.amount }
+                val balance = creditTotal - debitTotal
+
+                _uiState.value = SortAndFilterUiState(
+                    expenses = expenseList,
+                    totalCredit = creditTotal,
+                    totalDebit = debitTotal,
+                    balance = balance,
+                    isLoading = false
+                )
+            }
+        }
+    }
     val filteredExpenses: StateFlow<List<ExpenseEntity>> = _filteredExpenses
 
     init {
@@ -47,6 +75,7 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             isAfterFrom && isBeforeTo
         }
         _filteredExpenses.value = result
+        updateTotalsFromList(result)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -64,6 +93,7 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         _filteredExpenses.value = result
+        updateTotalsFromList(result)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -93,6 +123,22 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearFilter() {
         _filteredExpenses.value = _allExpenses.value
+        updateTotalsFromList(_allExpenses.value)
+    }
+    private fun updateTotalsFromList(list: List<ExpenseEntity>) {
+        val credit = list.filter { it.type.equals("credit", ignoreCase = true) }
+            .sumOf { it.amount }
+
+        val debit = list.filter { it.type.equals("debit", ignoreCase = true) }
+            .sumOf { it.amount }
+
+        _uiState.update {
+            it.copy(
+                totalCredit = credit,
+                totalDebit = debit,
+                balance = credit - debit
+            )
+        }
     }
 }
 

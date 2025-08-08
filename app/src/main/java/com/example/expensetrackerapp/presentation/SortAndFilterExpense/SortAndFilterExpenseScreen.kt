@@ -29,11 +29,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,10 +45,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.expensetrackerapp.data.local.ExpenseDatabase
 import com.example.expensetrackerapp.data.local.entity.ExpenseEntity
+import com.example.expensetrackerapp.data.repository.ExpenseRepository
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -58,13 +58,18 @@ import java.util.Locale
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun SortAndFilterExpenseScreen(navController: NavController) {
-    val context = LocalContext.current
-    val viewModel: ExpenseViewModel = viewModel(
+
+    /*val viewModel: ExpenseViewModel = viewModel(
         factory = ViewModelProvider.AndroidViewModelFactory.getInstance(context.applicationContext as Application)
-    )
+    )*/
+    val context = LocalContext.current
+    val db = ExpenseDatabase.getDatabase(context)
+    val dao = db.expenseDao()
+    val repository = remember { ExpenseRepository(dao) }
+    val viewModel = remember { ExpenseViewModel(repository) }
     val expenses by viewModel.filteredExpenses.collectAsState()
 
-
+    val uiState by viewModel.uiState.collectAsState()
     var selectedFilterType by remember { mutableStateOf("Date Range") }
     var amountCondition by remember { mutableStateOf(">") }
     var amountValue by remember { mutableStateOf("") }
@@ -78,7 +83,9 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
     val amountConditions = listOf("=", ">", "<")
 // Mode: "", "Sort", "Filter"
     var mode by remember { mutableStateOf("") }
-
+    LaunchedEffect(Unit) {
+        viewModel.onEvent(SortAndFilterUiEvent.LoadFilterExpenses)
+    }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -158,6 +165,7 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
 
                 Button(
                     onClick = {
+                        mode = ""
                         if (selectedFilterType == "Date Range") {
                             viewModel.applyDateFilter(
                                 fromDate = fromDate,
@@ -189,6 +197,7 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
 
                 Button(
                     onClick = {
+                        mode = ""
                         viewModel.applySort(
                             sortOption = selectedSortOption
                         )
@@ -198,7 +207,17 @@ fun SortAndFilterExpenseScreen(navController: NavController) {
                     Text("Apply")
                 }
             }
-
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Total Credit: ₹${uiState.totalCredit}")
+                    Text("Total Debit: ₹${uiState.totalDebit}")
+                    Text("Balance: ₹${uiState.balance}")
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
             LazyColumn {
@@ -284,22 +303,43 @@ fun ExpenseItem(expense: ExpenseEntity) {
             .padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(
-                "Date: ${
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            // Date (left aligned)
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
                     SimpleDateFormat(
-                        "ddMMMyy,hh:mma",
+                        "dd/MM/yy",
                         Locale.getDefault()
                     ).format(expense.date)
-                }"
-            )
-            Text("Description: ${expense.description}")
-            Text(
-                "Amount: ₹${expense.amount}",
-                color = color,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text("Type: ${expense.type}", color = color)
+                )
+            }
+
+            // Description (center)
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(expense.description)
+            }
+
+            // Amount (right aligned)
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Text(
+                    "₹${expense.amount}",
+                    color = color
+                )
+            }
         }
+
     }
 }
