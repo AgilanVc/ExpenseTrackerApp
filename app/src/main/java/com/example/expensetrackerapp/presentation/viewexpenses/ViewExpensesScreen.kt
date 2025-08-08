@@ -99,22 +99,34 @@ fun ViewExpensesScreen(navController: NavController) {
             } else {
                 val filteredExpenses = uiState.expenses
                     .filter {
-                        (selectedFilter == "All" || it.type.equals(selectedFilter, ignoreCase = true)) &&
+                        (selectedFilter == "All" || it.type.equals(
+                            selectedFilter,
+                            ignoreCase = true
+                        )) &&
                                 it.description.contains(searchQuery, ignoreCase = true)
                     }
 
                 if (filteredExpenses.isEmpty()) {
                     Text("No matching expenses found.")
                 } else {
+                    // Put these remembers just above the LazyColumn (so they are in the same composable scope)
+                    var showDeleteDialog by remember { mutableStateOf(false) }
+                    var pendingDeleteExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
+
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         itemsIndexed(filteredExpenses) { index, expense ->
 
+                            // intercept swipe -> ask for confirmation instead of deleting immediately
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { value ->
                                     if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
-                                        viewModel.deleteExpense(expense)
-                                        true
-                                    } else false
+                                        // store the swiped expense and open confirmation dialog
+                                        pendingDeleteExpense = expense
+                                        showDeleteDialog = true
+                                        false // prevent auto-dismiss until user confirms
+                                    } else {
+                                        false
+                                    }
                                 }
                             )
 
@@ -141,6 +153,42 @@ fun ViewExpensesScreen(navController: NavController) {
                             )
                         }
                     }
+
+// Confirmation dialog outside the LazyColumn (show once)
+                    if (showDeleteDialog && pendingDeleteExpense != null) {
+                        val e = pendingDeleteExpense!!
+                        AlertDialog(
+                            onDismissRequest = {
+                                // close dialog and clear pending item; nothing deleted
+                                showDeleteDialog = false
+                                pendingDeleteExpense = null
+                            },
+                            title = { Text("Delete expense") },
+                            text = {
+                                Text("Are you sure you want to delete \"${e.description}\" for ₹${e.amount}?")
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    // Perform deletion and close dialog
+                                    viewModel.deleteExpense(e)
+                                    showDeleteDialog = false
+                                    pendingDeleteExpense = null
+                                }) {
+                                    Text("Yes")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    // Cancel deletion and close dialog
+                                    showDeleteDialog = false
+                                    pendingDeleteExpense = null
+                                }) {
+                                    Text("No")
+                                }
+                            }
+                        )
+                    }
+
                 }
             }
         }
