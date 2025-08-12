@@ -6,6 +6,7 @@ import androidx.room.DeleteColumn
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.example.expensetrackerapp.data.local.entity.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -27,5 +28,6 @@ interface ExpenseDao {
     @Delete
     suspend fun deleteExpense(expense: ExpenseEntity)
 
-
+    @Update
+    suspend fun updateExpense(expense: ExpenseEntity)
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -115,41 +116,10 @@ fun ViewExpensesScreen(navController: NavController) {
 
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         itemsIndexed(filteredExpenses) { index, expense ->
-
-                            // intercept swipe -> ask for confirmation instead of deleting immediately
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
-                                        // store the swiped expense and open confirmation dialog
-                                        pendingDeleteExpense = expense
-                                        showDeleteDialog = true
-                                        false // prevent auto-dismiss until user confirms
-                                    } else {
-                                        false
-                                    }
-                                }
-                            )
-
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color.Red)
-                                            .padding(start = 16.dp),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = Color.White
-                                        )
-                                    }
-                                },
-                                content = {
-                                    ExpenseItem(serialNo = index + 1, expense = expense)
-                                }
+                            ExpenseItem(
+                                serialNo = index + 1,
+                                expense = expense,
+                                viewModel = viewModel
                             )
                         }
                     }
@@ -223,21 +193,141 @@ fun DropdownMenuFilter(
 
 
 @Composable
-fun ExpenseItem(serialNo: Int, expense: ExpenseEntity) {
+fun ExpenseItem(
+    serialNo: Int,
+    expense: ExpenseEntity,
+    viewModel: ViewExpensesViewModel // pass your ViewModel here
+) {
     val color = if (expense.type == "credit") Color(0xFF2E7D32) else Color(0xFFC62828)
     val date = remember(expense.date) {
-        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(expense.date))
+        SimpleDateFormat("dd/MM/yy-hh:mma", Locale.getDefault()).format(Date(expense.date))
     }
 
+    var showEditDialog by remember { mutableStateOf(false) }
+    var expenseToEdit by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var pendingDeleteExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
+
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("S.No: $serialNo", style = MaterialTheme.typography.labelSmall)
-            Text("Date: $date", style = MaterialTheme.typography.labelSmall)
-            Text(expense.description, style = MaterialTheme.typography.titleMedium)
-            Text("₹${expense.amount}", color = color, style = MaterialTheme.typography.bodyLarge)
-            Text("Type: ${expense.type}", color = color)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(date, style = MaterialTheme.typography.labelMedium)
+                    Row {
+                        IconButton(onClick = {
+                            expenseToEdit = expense
+                            showEditDialog = true
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        IconButton(onClick = {
+                            pendingDeleteExpense = expense
+                            showDeleteDialog = true
+                        }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.Red
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        expense.description,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        "₹${expense.amount}",
+                        color = color,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
         }
     }
+
+    // ===== Edit Dialog =====
+    if (showEditDialog && expenseToEdit != null) {
+        var description by remember { mutableStateOf(expenseToEdit!!.description) }
+        var amount by remember { mutableStateOf(expenseToEdit!!.amount.toString()) }
+
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Edit Expense") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") }
+                    )
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = { Text("Amount") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    expenseToEdit?.let {
+                        val updatedExpense = it.copy(
+                            description = description,
+                            amount = amount.toDoubleOrNull() ?: it.amount
+                        )
+                        viewModel.updateExpense(updatedExpense)
+                    }
+                    showEditDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ===== Delete Confirmation Dialog =====
+    if (showDeleteDialog && pendingDeleteExpense != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Expense") },
+            text = { Text("Are you sure you want to delete this expense?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeleteExpense?.let { viewModel.deleteExpense(it) }
+                    showDeleteDialog = false
+                }) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
+
+

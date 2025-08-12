@@ -9,5 +9,6 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     fun getTotalCredit() = dao.getTotalCredit()
     fun getTotalDebit() = dao.getTotalDebit()
     suspend fun deleteExpense(expense: ExpenseEntity) = dao.deleteExpense(expense)
+    suspend fun updateExpense(expense: ExpenseEntity) = dao.updateExpense(expense)
 
 }

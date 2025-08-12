@@ -45,4 +45,10 @@ class ViewExpensesViewModel(
             // Optionally reload list or rely on Room Flow auto-update
         }
     }
-   }
+    fun updateExpense(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            repository.updateExpense(expense)
+        }
+    }
+
+}
