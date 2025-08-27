@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.expensetrackerapp"
+    namespace = "com.agilan.expensetrackerapp"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.expensetrackerapp"
+        applicationId = "com.agilan.expensetrackerapp"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
